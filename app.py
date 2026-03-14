@@ -1,29 +1,12 @@
-import google.generativeai as genai
 from dotenv import load_dotenv
 import streamlit as st
 import json
 import os
+from groq import Groq
 
 load_dotenv()
-genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
 
-model = genai.GenerativeModel(
-    model_name="gemini-2.0-flash-lite",
-        system_instruction="""
-        You are an expert tutor. When explaining topics: 
-        1. Always think step by step
-        2. Do not ever use complex terminologies
-        3. Always respond in this exact JSON format, nothing else: 
-
-        {
-            "topic": "", 
-            "simple_explanation": "",
-            "steps":[], 
-            "real_world_example": "", 
-            "difficulty": "Easy/Medium/Hard"
-        }
-        """
-)
+client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
 st.set_page_config(
     page_title="AI Tutor",
@@ -31,33 +14,62 @@ st.set_page_config(
     layout="centered"
 )
 
-st.title(" AI Tutor 🤖")
-st.subheader("Ask me anything -- I'll explain it simply!")
+st.title("🤖 AI Tutor")
+st.subheader("Ask me anything — I'll explain it simply!")
 st.divider()
 
-ques = st.text_input("🔍 Enter your topic or question here: ")
+question = st.text_input("🔍 Enter your topic or question here:")
 
-if st.button("ASK AI"): 
-    if ques.strip() == "":
+if st.button("Ask AI"):
+
+    if question.strip() == "":
         st.warning("⚠️ Please type a question first!")
-    else: 
-        with st.spinner("🤖 AI is thinking..."):
-            response = model.generate_content(ques)
 
-        try: 
-            raw = response.text.strip()
+    else:
+        with st.spinner("🤖 AI is thinking..."):
+
+        
+            chat_completion = client.chat.completions.create(
+                model="llama-3.3-70b-versatile",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": """You are an expert tutor. When explaining any topic:
+                        1. Think step by step before answering. Do not use complex terminologies
+                        2. Respond ONLY in this exact JSON format, nothing else:
+                        {
+                            "topic": "",
+                            "simple_explanation": "",
+                            "steps": [],
+                            "real_world_example": "",
+                            "difficulty": "Easy/Medium/Hard"
+                        }"""
+                    },
+                    {
+                        "role": "user",
+                        "content": question
+                    }
+                ]
+            )
+
+        response_text = chat_completion.choices[0].message.content
+
+        try:
+            raw = response_text.strip()
             raw = raw.replace("```json", "").replace("```", "").strip()
             data = json.loads(raw)
-            st.divider() #display results
 
-            col1, col2 = st.columns(2)
-            with col1: 
-                st.metric(label="Topic", value=data['topic'])
-            with col2: 
-                st.metric(label="Difficulty", value=data['difficulty'])
             st.divider()
 
-            st.subheader("Simple Explanation")
+            col1, col2 = st.columns(2)
+            with col1:
+                st.metric(label="📚 Topic", value=data['topic'])
+            with col2:
+                st.metric(label="⚡ Difficulty", value=data['difficulty'])
+
+            st.divider()
+
+            st.subheader("💡 Simple Explanation")
             st.info(data['simple_explanation'])
 
             st.subheader("📋 Step by Step")
@@ -65,21 +77,15 @@ if st.button("ASK AI"):
                 if isinstance(step, dict):
                     title = step.get('title', '')
                     description = step.get('description', '')
-
                     with st.expander(f"{i}. {title}"):
                         st.write(description)
-
                 else:
                     clean_step = step.replace("\\n", "\n")
                     st.write(f"**{i}.** {clean_step}")
 
-            st.subheader("Real World Example")
+            st.subheader("🌍 Real World Example")
             st.success(data['real_world_example'])
-        
+
         except Exception as e:
-            if "ResourceExhausted" in str(e):
-                st.error("⚠️ Daily API limit reached. Please try again after some time.")
-            elif "NotFound" in str(e):
-                st.error("⚠️ AI model not available.")
-            else:
-                st.error("⚠️ Something went wrong. Please try again.")
+            st.subheader("🤖 AI says:")
+            st.write(response_text)
