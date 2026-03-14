@@ -76,6 +76,10 @@ if st.button("ASK AI"):
             st.subheader("Real World Example")
             st.success(data['real_world_example'])
         
-        except: 
-            st.subheader("AI Says : ")
-            st.write(response.text)
+        except Exception as e:
+            if "ResourceExhausted" in str(e):
+                st.error("⚠️ Daily API limit reached. Please try again after some time.")
+            elif "NotFound" in str(e):
+                st.error("⚠️ AI model not available.")
+            else:
+                st.error("⚠️ Something went wrong. Please try again.")
