@@ -6,7 +6,13 @@ from groq import Groq
 
 load_dotenv()
 
-client = Groq(api_key=os.getenv("GROQ_API_KEY"))
+api_key = os.getenv("GROQ_API_KEY")
+if not api_key:
+    st.error("❌ GROQ_API_KEY not found. Add it to a .env file next to app.py.")
+    st.stop()
+
+client = Groq(api_key=api_key)
+MODEL = "openai/gpt-oss-120b"  # llama-3.3-70b-versatile was shut down on 16 Aug 2026
 
 st.set_page_config(
     page_title="AI Tutor",
@@ -27,10 +33,9 @@ if st.button("Ask AI"):
 
     else:
         with st.spinner("🤖 AI is thinking..."):
-
-        
-            chat_completion = client.chat.completions.create(
-                model="llama-3.3-70b-versatile",
+            try:
+                chat_completion = client.chat.completions.create(
+                model=MODEL,
                 messages=[
                     {
                         "role": "system",
@@ -49,8 +54,12 @@ if st.button("Ask AI"):
                         "role": "user",
                         "content": question
                     }
-                ]
-            )
+                ],
+                response_format={"type": "json_object"}
+                )
+            except Exception as e:
+                st.error(f"❌ API error: {e}")
+                st.stop()
 
         response_text = chat_completion.choices[0].message.content
 
